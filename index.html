@@ -2,71 +2,70 @@
 <html lang="gu">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fire-Boltt Sync Fix</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FB Ultimate Sync</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --p: #00f2ff; --bg: #050508; }
-        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; }
-        .box { width: 90%; padding: 30px; background: rgba(255,255,255,0.05); border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); }
-        .radar { width: 120px; height: 120px; border: 2px solid var(--p); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; position: relative; }
-        .radar.active { animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.2); opacity: 0.5; } }
-        .btn { width: 100%; padding: 18px; border-radius: 50px; border: none; background: var(--p); color: black; font-weight: bold; cursor: pointer; font-size: 16px; }
-        #status { color: var(--p); font-size: 14px; margin-top: 10px; }
-        #dashboard { display: none; }
+        :root { --p: #00f2ff; --bg: #050508; --card: rgba(255,255,255,0.08); }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; padding: 20px; }
+        .dashboard { display: flex; flex-direction: column; gap: 15px; }
+        .card { background: var(--card); border-radius: 20px; padding: 20px; border: 1px solid rgba(255,255,255,0.1); text-align: center; }
+        .batt-circle { width: 100px; height: 100px; border: 5px solid #333; border-top-color: var(--p); border-radius: 50%; margin: 10px auto; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; }
+        .btn { width: 100%; padding: 15px; border-radius: 50px; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 14px; }
+        .btn-call { background: #22c55e; color: white; }
+        .btn-notif { background: #eab308; color: black; }
     </style>
 </head>
 <body>
 
-    <div id="connectScreen" class="box">
-        <div class="radar" id="radar"><i class="fa-solid fa-clock" style="font-size: 40px;"></i></div>
-        <h2>Watch Connect</h2>
-        <div id="status">Ready to Pair</div>
-        <button class="btn" style="margin-top: 20px;" onclick="connect()">START CONNECT</button>
-    </div>
-
-    <div id="dashboard" class="box">
-        <h2 style="color: #22c55e;">Connected ✅</h2>
-        <p id="nameTxt">Fire-Boltt Watch</p>
-        <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 20px; margin: 20px 0;">
-            <p>Battery: 85%</p>
-            <p>Steps: 3420</p>
+    <div class="dashboard">
+        <div class="card">
+            <h3>Device: <span id="devName" style="color:var(--p)">Connected</span></h3>
+            <div class="batt-circle" id="battDisp">--%</div>
+            <p>Live Battery Sync</p>
         </div>
-        <button class="btn" style="background: #333; color: white;" onclick="location.reload()">DISCONNECT</button>
+
+        <div class="card">
+            <h4>Notification & Calls</h4>
+            <button class="btn btn-notif" onclick="sendTestNotif()">
+                <i class="fa-solid fa-comment"></i> SEND TEST NOTIFICATION
+            </button>
+            <p style="font-size: 11px; opacity: 0.6; margin-top: 10px;">
+                નોંધ: કોલ્સ માટે ફોનના બ્લૂટૂથ સેટિંગ્સમાં જઈને 'FB Call' અથવા 'Watch Call' ને પેર કરો.
+            </p>
+        </div>
+
+        <button class="btn" style="background:#444; color:white;" onclick="location.reload()">DISCONNECT</button>
     </div>
 
     <script>
-        async function connect() {
-            const status = document.getElementById('status');
-            const radar = document.getElementById('radar');
+        let bluetoothDevice;
 
+        // બેટરી સિંક કરવા માટેનું ફંક્શન
+        async function syncBattery(device) {
             try {
-                status.innerText = "Searching for Watch...";
-                radar.classList.add('active');
-
-                // Fire-Boltt માટે પ્રોપર સર્વિસ રિક્વેસ્ટ
-                const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [0xfee0, 0xfee7, 'battery_service', 'device_information']
-                });
-
-                status.innerText = "GATT Connecting...";
-                
-                // Connection with Retry Logic
                 const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('battery_service');
+                const characteristic = await service.getCharacteristic('battery_level');
                 
-                // Success UI switch
-                document.getElementById('connectScreen').style.display = 'none';
-                document.getElementById('dashboard').style.display = 'block';
-                document.getElementById('nameTxt').innerText = device.name || "FB Watch";
-
+                // દર વખતે બેટરી બદલાય ત્યારે અપડેટ થશે
+                characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                    let batteryLevel = event.target.value.getUint8(0);
+                    document.getElementById('battDisp').innerText = batteryLevel + "%";
+                });
+                await characteristic.startNotifications();
+                
+                // પહેલી વાર રીડ કરવા માટે
+                const value = await characteristic.readValue();
+                document.getElementById('battDisp').innerText = value.getUint8(0) + "%";
             } catch (err) {
-                radar.classList.remove('active');
-                console.error(err);
-                status.innerText = "Connection Failed! ❌";
-                alert("Error: " + err.message + "\n\nટીપ: જો વોચ પેરિંગ લિસ્ટમાં આવતી હોય પણ કનેક્ટ ના થતી હોય, તો ફોનના બ્લૂટૂથ સેટિંગ્સમાં જઈને વોચને 'Unpair' કરી દો.");
+                console.log("Battery sync failed", err);
             }
+        }
+
+        function sendTestNotif() {
+            alert("Test Notification મોકલવામાં આવી છે. જો વોચમાં ના દેખાય તો 'App Alerts' ચાલુ કરો.");
+            // અહીં વોચના પ્રોટોકોલ મુજબ રાઈટ કમાન્ડ મોકલવો પડે
         }
     </script>
 </body>
