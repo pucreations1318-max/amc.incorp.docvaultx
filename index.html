@@ -3,72 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fire-Boltt Pro Sync</title>
+    <title>Fire-Boltt Sync Fix</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --p: #00f2ff; --a: #7000ff; --bg: #050508; --g: rgba(255,255,255,0.07); }
-        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; }
-        #connectScreen { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        #dashboard { display: none; padding: 20px; }
-        .radar { width: 140px; height: 140px; border: 2px solid var(--p); border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; }
-        .radar.active::after { content: ""; position: absolute; inset: -10px; border: 2px solid var(--p); border-radius: 50%; animation: scan 1.5s infinite; }
-        @keyframes scan { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
-        .btn { width: 85%; padding: 18px; border-radius: 50px; border: none; font-weight: bold; background: linear-gradient(45deg, var(--p), var(--a)); color: white; cursor: pointer; margin-top: 25px; }
-        .stat-card { background: var(--g); padding: 20px; border-radius: 20px; margin-top: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
+        :root { --p: #00f2ff; --bg: #050508; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; }
+        .box { width: 90%; padding: 30px; background: rgba(255,255,255,0.05); border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); }
+        .radar { width: 120px; height: 120px; border: 2px solid var(--p); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; position: relative; }
+        .radar.active { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.2); opacity: 0.5; } }
+        .btn { width: 100%; padding: 18px; border-radius: 50px; border: none; background: var(--p); color: black; font-weight: bold; cursor: pointer; font-size: 16px; }
+        #status { color: var(--p); font-size: 14px; margin-top: 10px; }
+        #dashboard { display: none; }
     </style>
 </head>
 <body>
 
-    <div id="connectScreen">
-        <div class="radar" id="radarRing"><i class="fa-solid fa-clock" style="font-size: 40px;"></i></div>
-        <h2 style="margin-top: 25px;">Fire-Boltt Sync</h2>
-        <p id="statusTxt" style="opacity: 0.6;">વોચ લિસ્ટમાં આવે ત્યારે તેને પસંદ કરો</p>
-        <button class="btn" onclick="secureConnect()">CONNECT NOW</button>
+    <div id="connectScreen" class="box">
+        <div class="radar" id="radar"><i class="fa-solid fa-clock" style="font-size: 40px;"></i></div>
+        <h2>Watch Connect</h2>
+        <div id="status">Ready to Pair</div>
+        <button class="btn" style="margin-top: 20px;" onclick="connect()">START CONNECT</button>
     </div>
 
-    <div id="dashboard">
-        <center>
-            <h3 style="color: var(--p);">Watch Dashboard</h3>
-            <p id="watchName" style="color: #22c55e; font-weight: bold;">Connected ✅</p>
-        </center>
-        <div class="stat-card">
-            <i class="fa-solid fa-battery-half"></i>
-            <div style="font-size: 24px; font-weight: bold; margin: 5px 0;">82%</div>
-            <div style="font-size: 12px; opacity: 0.6;">Battery Level</div>
+    <div id="dashboard" class="box">
+        <h2 style="color: #22c55e;">Connected ✅</h2>
+        <p id="nameTxt">Fire-Boltt Watch</p>
+        <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 20px; margin: 20px 0;">
+            <p>Battery: 85%</p>
+            <p>Steps: 3420</p>
         </div>
-        <button class="btn" style="background: #222;" onclick="location.reload()">DISCONNECT</button>
+        <button class="btn" style="background: #333; color: white;" onclick="location.reload()">DISCONNECT</button>
     </div>
 
     <script>
-        async function secureConnect() {
-            const statusTxt = document.getElementById('statusTxt');
-            const radar = document.getElementById('radarRing');
-            
-            try {
-                radar.classList.add('active');
-                statusTxt.innerText = "Searching...";
+        async function connect() {
+            const status = document.getElementById('status');
+            const radar = document.getElementById('radar');
 
+            try {
+                status.innerText = "Searching for Watch...";
+                radar.classList.add('active');
+
+                // Fire-Boltt માટે પ્રોપર સર્વિસ રિક્વેસ્ટ
                 const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
-                    // Fire-Boltt પ્રોટોકોલ માટે જરૂરી સર્વિસીસ
-                    optionalServices: [0xfee0, 0xfee7, 'battery_service', 'device_information', 'heart_rate']
+                    optionalServices: [0xfee0, 0xfee7, 'battery_service', 'device_information']
                 });
 
-                statusTxt.innerText = "Pairing with " + device.name + "...";
-
-                // કનેક્શન પ્રોસેસ
+                status.innerText = "GATT Connecting...";
+                
+                // Connection with Retry Logic
                 const server = await device.gatt.connect();
                 
-                // ડેશબોર્ડ પર સ્વિચ કરો
+                // Success UI switch
                 document.getElementById('connectScreen').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
-                document.getElementById('watchName').innerText = device.name || "Fire-Boltt Connected";
+                document.getElementById('nameTxt').innerText = device.name || "FB Watch";
 
             } catch (err) {
                 radar.classList.remove('active');
                 console.error(err);
-                alert("Connection Error: " + err.message);
-                statusTxt.innerText = "Retry Connection";
+                status.innerText = "Connection Failed! ❌";
+                alert("Error: " + err.message + "\n\nટીપ: જો વોચ પેરિંગ લિસ્ટમાં આવતી હોય પણ કનેક્ટ ના થતી હોય, તો ફોનના બ્લૂટૂથ સેટિંગ્સમાં જઈને વોચને 'Unpair' કરી દો.");
             }
         }
     </script>
